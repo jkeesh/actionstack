@@ -104,21 +104,18 @@ $(function(){
 		// Our FirebaseDataStructure
 		var dataStructure;
 
-		// The id for this action stack
-		var stackID;
+		// The id for this action data structure
+		var structureID;
 
 		// The firebase reference for this page
 		var pageRef;
-
-		// The firebase for the stack
-		var stackRef;
 
 		// The current thing you should be doing
 		var curRef;
 
 		function makeDataStructure(){
 			if(type == 'stack'){
-				stackRef = pageRef.child('stack');
+				var stackRef = pageRef.child('stack');
 				dataStructure = new FirebaseStack(stackRef);
 			}else{
 				console.log("Bad type");
@@ -127,8 +124,8 @@ $(function(){
 
 		// Look up an existing action stack
 		function lookupStructure(){
-	 		stackID = window.location.hash.replace('#', '');
-	 		pageRef = myRootRef.child(stackID);
+	 		structureID = window.location.hash.replace('#', '');
+	 		pageRef = myRootRef.child(structureID);
 		}
 
 		// There is no stack, so create one.
@@ -136,8 +133,8 @@ $(function(){
 		 	pageRef = myRootRef.push({
 				title: DEFAULT_TITLE
 			});
-			stackID = pageRef.name();
-			location.hash = stackID;
+			structureID = pageRef.name();
+			location.hash = structureID;
 		}
 
 		// Create a new task
@@ -179,7 +176,7 @@ $(function(){
 		// Set the title and id of the stack
 		function setData(){
 			$(TITLE_ID).html(DEFAULT_TITLE);
-			$(STRUCTURE_ID).html(stackID);
+			$(STRUCTURE_ID).html(structureID);
 		}
 
 		// Setup the page
@@ -188,10 +185,8 @@ $(function(){
 
 			// See if we have an old stack, or should make a new one
 			if(window.location.hash){
-				console.log("Looking up old...");
 				lookupStructure();
 			}else{
-				console.log("Creating new...");
 				createStructure();
 			}
 			makeDataStructure();
@@ -204,22 +199,3 @@ $(function(){
 		setup();
 	}(DATA_STRUCTURE_TYPE));
 });
-
-
-/*
-Questions:
-
-Why do I not need to wait for a callback on push() to get the name?
-
-Why do i get a remove genreated for each thing in the list?
-
-			var lastItem = stackRef.limit(1);
-			lastItem.on('child_added', function(snap) { 
-				/// works...
-			});
-
-			lastItem.on('child_removed', function(snap) { 
-				/// gets called for each one...?
-			});
-
-*/
