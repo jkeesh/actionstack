@@ -1,3 +1,6 @@
+var DATA_STRUCTURE_TYPE = 'stack';
+
+
 /* 
  This represnts a firebase data structure. A FirebaseDataStructure
  
@@ -25,6 +28,10 @@ FirebaseDataStructure.prototype.size = function(callback){
 		callback(size);
 	});
 }
+
+//////////////////////////////////////////////
+// FirebaseStack
+//////////////////////////////////////////////
 
 /*
 A FirebaseStack provides last-in-first-out (LIFO) access to a list
@@ -82,11 +89,14 @@ FirebaseStack.prototype.getFirstItem = function(callback){
 
 
 $(function(){
+	ActionStack = (function(type){
+		var ADD_BUTTON = '#add-button';
+		var ADD_INPUT = '#add-input';
+		var REMOVE_BUTTON = '#remove-button';
+		var TITLE_ID = '#title';
+		var CURRENT = '#current';
+		var STRUCTURE_ID = '#stack-id';
 
-
-
-
-	ActionStack = (function(){
 		var DEFAULT_TITLE = 'Your Action Stack';
 		var FIREBASE_URL = 'https://jkeesh.firebaseio.com/actionstack/';
 		var myRootRef = new Firebase(FIREBASE_URL);
@@ -107,8 +117,12 @@ $(function(){
 		var curRef;
 
 		function makeDataStructure(){
-			stackRef = pageRef.child('stack');
-			dataStructure = new FirebaseStack(stackRef);
+			if(type == 'stack'){
+				stackRef = pageRef.child('stack');
+				dataStructure = new FirebaseStack(stackRef);
+			}else{
+				console.log("Bad type");
+			}
 		}
 
 		// Look up an existing action stack
@@ -128,49 +142,47 @@ $(function(){
 
 		// Create a new task
 		function addTask(){
-			var task = $("#push-input").val();
-			$("#push-input").val("");	
+			var task = $(ADD_INPUT).val();
+			$(ADD_INPUT).val("");	
 
 			dataStructure.addOneItem(task);
 
 			setCurrent();
 		}
 
+		// Remove a task from our data structure
 		function removeTask(){
 			dataStructure.removeOneItem(function(success){
-				console.log("Success? " + success);
 				setCurrent();
 			});
 		}
 
+		// Set the value of the current task
 		function setCurrent(){
-			console.log("===== Setting current...");
 			dataStructure.getFirstItem(function(ref, val){
-				console.log("In set current callback...");
-				console.log(val);
-				$("#current").html(val.value);
-				console.log("===== end setCurrent");
+				$(CURRENT).html(val.value);
 			});
 		}
 
 		// Setup the button to respond to clicks and
 		// the text field to respond to enter
 		function setupInputs(){
-			$("#push-button").click(addTask);
-			$("#push-input").keypress(function(e){
+			$(ADD_BUTTON).click(addTask);
+			$(ADD_INPUT).keypress(function(e){
 				if(e.keyCode == 13){
 					addTask();
 				}
 			});
-			$("#pop-button").click(removeTask);
+			$(REMOVE_BUTTON).click(removeTask);
 		}
 
 		// Set the title and id of the stack
 		function setData(){
-			$("#title").html(DEFAULT_TITLE);
-			$("#stack-id").html(stackID);
+			$(TITLE_ID).html(DEFAULT_TITLE);
+			$(STRUCTURE_ID).html(stackID);
 		}
 
+		// Setup the page
 		function setup(){
 			setupInputs();
 
@@ -190,7 +202,7 @@ $(function(){
 
 		// Do things
 		setup();
-	}());
+	}(DATA_STRUCTURE_TYPE));
 });
 
 
