@@ -1,55 +1,84 @@
+/* 
+ This represnts a firebase data structure. A FirebaseDataStructure
+ 
+ has three important methods
+
+ addOneItem
+ removeOneItem
+ getFirsItem
+
+ each different implementation of a firebase datastructure can handle
+ these methods in different ways for different access to your list data
+ */
 function FirebaseDataStructure(ref){
 	this.ref = ref;
 }
 
 FirebaseDataStructure.prototype.addOneItem = function(item){}
 FirebaseDataStructure.prototype.removeOneItem = function(){}
+FirebaseDataStructure.prototype.getFirstItem = function(){}
 
 
-FirebaseStack.prototype = new FirebaseDataStructure();
-FirebaseStack.prototype.constructor = FirebaseStack;
-function FirebaseStack(ref){
-	FirebaseDataStructure.call(this, ref);
-}
-
-FirebaseStack.prototype.addOneItem = function(item){
-	this.ref.push({
-		'value': item
-	});
-}
-
-FirebaseStack.prototype.removeOneItem = function(){
-	this.ref.startAt().limit(1).on("child_added", function(snap){
-		console.log(snap);
-		console.log(snap.val());
-		console.log(snap.name());
-		console.log(snap.ref());
+FirebaseDataStructure.prototype.size = function(callback){
+	this.ref.once('value', function(snap){
+		var size = snap.numChildren();
+		callback(size);
 	});
 }
 
 /*
-	function makeList(ref) {
-  var fruits = ["banana", "apple", "grape", "orange"];
-  for (var i = 0; i < fruits.length; i++) {
-    ref.push(fruits[i]);
-  }
-}
- 
-function getFirstFromList(ref, cb) {
-  ref.startAt().limit(1).on("child_added", function(snapshot) {
-    cb(snapshot.val());
-  });
-}
- 
-// Running this should popup an alert with "banana".
-function go() {
-  var testRef = new Firebase("https://example.firebaseIO-demo.com/");
-  makeList(testRef);
-  getFirstFromList(testRef, function(val) {
-    alert(val);
-  });
-}
+A FirebaseStack provides last-in-first-out (LIFO) access to a list
+When an item is added, it goes to the front of the list. When we
+remove an item, we remove the most recently added item
 */
+FirebaseStack.prototype = new FirebaseDataStructure();
+FirebaseStack.prototype.constructor = FirebaseStack;
+
+// This is the maximum priority for our stack. The first item added
+// will get this priority. Each item after will get a lower priority.
+FirebaseStack.MAX_PRIORITY = 10000;
+
+function FirebaseStack(ref){
+	FirebaseDataStructure.call(this, ref);
+}
+
+
+FirebaseStack.prototype.getPriority = function(callback){
+	this.size(function(size){
+		var result = '' + (FirebaseStack.MAX_PRIORITY - size);	
+		callback(result);
+	});
+}
+
+/* 
+This function adds an item with value item to our stack. We figure out
+how to place it properly by getting the priority and setting that
+value in the callback.
+
+@param item 	{string}		the item to add
+*/
+FirebaseStack.prototype.addOneItem = function(item){
+	var result = this.ref.push({
+		'value': item
+	});
+
+	this.getPriority(function(priority){
+		console.log("Setting priority of " + item + " to " + priority);
+		result.setPriority(priority);
+	});
+}
+
+FirebaseStack.prototype.removeOneItem = function(callback){
+	this.getFirstItem(function(ref, value){
+		ref.remove(callback);
+	})
+}
+
+FirebaseStack.prototype.getFirstItem = function(callback){
+	this.ref.startAt().limit(1).once("child_added", function(snap){
+		callback(snap.ref(), snap.val());
+	});	
+}
 
 
 $(function(){
@@ -61,6 +90,9 @@ $(function(){
 		var DEFAULT_TITLE = 'Your Action Stack';
 		var FIREBASE_URL = 'https://jkeesh.firebaseio.com/actionstack/';
 		var myRootRef = new Firebase(FIREBASE_URL);
+
+		// Our FirebaseDataStructure
+		var dataStructure;
 
 		// The id for this action stack
 		var stackID;
@@ -74,108 +106,63 @@ $(function(){
 		// The current thing you should be doing
 		var curRef;
 
+		function makeDataStructure(){
+			stackRef = pageRef.child('stack');
+			dataStructure = new FirebaseStack(stackRef);
+		}
+
 		// Look up an existing action stack
-		function lookupStack(){
+		function lookupStructure(){
 	 		stackID = window.location.hash.replace('#', '');
 	 		pageRef = myRootRef.child(stackID);
-	 		stackRef = pageRef.child('stack');
 		}
 
 		// There is no stack, so create one.
-		function createStack(){
+		function createStructure(){
 		 	pageRef = myRootRef.push({
 				title: DEFAULT_TITLE
 			});
 			stackID = pageRef.name();
 			location.hash = stackID;
-		 	stackRef = pageRef.child('stack');
 		}
 
 		// Create a new task
-		function pushTask(){
+		function addTask(){
 			var task = $("#push-input").val();
-			stackRef.push({
-				'value': task
-			})
 			$("#push-input").val("");	
-			//setCurrent(task);		
+
+			dataStructure.addOneItem(task);
+
+			setCurrent();
 		}
 
-		function popTask(){
-			curRef.remove();
-
-
-		}
-
-		function listenForUpdate(){
-			var lastItem = stackRef.limit(1);
-			lastItem.on('child_added', function(snap) { 
-				console.log("ADD");
-				var cur = snap.val();
-				console.log(snap.name())
-				console.log(snap.ref());
-
-				curRef = snap.ref();
-
-				console.log(cur);
-				setCurrent(cur.value);
-			});
-
-			stackRef.on('child_removed', function(removed){
-				console.log("REMOVED:" );
-				console.log(removed.val());
-
-				stackRef.on('value', function(snap){
-					console.log("NEW STATUS");
-					console.log(snap.val());
-
-					var numChildren = snap.numChildren();
-
-					if(numChildren == 0){
-						setCurrent("Empty!");
-						return;
-					}
-
-					console.log(numChildren);
-					var i = 1;
-					snap.forEach(function(child){
-						console.log(i);
-						var cur = child.val();
-						console.log(child.ref());
-
-						if(i == numChildren){
-							setCurrent(cur.value);
-							curRef = child.ref();
-						}
-
-						console.log(cur);
-						i++;
-					})
-				})
+		function removeTask(){
+			dataStructure.removeOneItem(function(success){
+				console.log("Success? " + success);
+				setCurrent();
 			});
 		}
 
-		function setCurrent(val){
-			$("#current").html(val);
-		}
-
-		function getCurrentItem(){
-			stackRef.once('value', function(snap){
-				console.log(snap);
-				console.log(snap.val());
+		function setCurrent(){
+			console.log("===== Setting current...");
+			dataStructure.getFirstItem(function(ref, val){
+				console.log("In set current callback...");
+				console.log(val);
+				$("#current").html(val.value);
+				console.log("===== end setCurrent");
 			});
 		}
 
 		// Setup the button to respond to clicks and
 		// the text field to respond to enter
 		function setupInputs(){
-			$("#push-button").click(pushTask);
+			$("#push-button").click(addTask);
 			$("#push-input").keypress(function(e){
 				if(e.keyCode == 13){
-					pushTask();
+					addTask();
 				}
 			});
-			$("#pop-button").click(popTask);
+			$("#pop-button").click(removeTask);
 		}
 
 		// Set the title and id of the stack
@@ -190,15 +177,15 @@ $(function(){
 			// See if we have an old stack, or should make a new one
 			if(window.location.hash){
 				console.log("Looking up old...");
-				lookupStack();
+				lookupStructure();
 			}else{
 				console.log("Creating new...");
-				createStack();
+				createStructure();
 			}
+			makeDataStructure();
 
 			setData();
-			listenForUpdate();
-//			getCurrentItem();
+			setCurrent();
 		}
 
 		// Do things
