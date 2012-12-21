@@ -1,4 +1,5 @@
-var DATA_STRUCTURE_TYPE = 'stack';
+/// options = 'stack', 'queue'
+var DATA_STRUCTURE_TYPE = 'queue';
 
 
 /* 
@@ -17,10 +18,37 @@ function FirebaseDataStructure(ref){
 	this.ref = ref;
 }
 
-FirebaseDataStructure.prototype.addOneItem = function(item){}
-FirebaseDataStructure.prototype.removeOneItem = function(){}
-FirebaseDataStructure.prototype.getFirstItem = function(){}
+FirebaseDataStructure.prototype.getPriority = function(callback){
+	// use the default
+	callback(null);
+}
 
+FirebaseDataStructure.prototype.getFirstItem = function(callback){
+	this.ref.startAt().limit(1).once("child_added", function(snap){
+		callback(snap.ref(), snap.val());
+	});	
+}
+
+FirebaseDataStructure.prototype.removeOneItem = function(callback){
+	this.getFirstItem(function(ref, value){
+		ref.remove(callback);
+	})
+}
+
+FirebaseDataStructure.prototype.getDefaultTitle = function(){
+	return "My Data Structure";
+}
+
+/* 
+This function adds an item with value item to our list.
+
+@param item 	{string}		the item to add
+*/
+FirebaseDataStructure.prototype.addOneItem = function(item){
+	var result = this.ref.push({
+		'value': item
+	});
+}
 
 FirebaseDataStructure.prototype.size = function(callback){
 	this.ref.once('value', function(snap){
@@ -49,6 +77,10 @@ function FirebaseStack(ref){
 	FirebaseDataStructure.call(this, ref);
 }
 
+FirebaseStack.prototype.getDefaultTitle = function(){
+	return "My Action Stack";
+}
+
 
 FirebaseStack.prototype.getPriority = function(callback){
 	this.size(function(size){
@@ -70,7 +102,6 @@ FirebaseStack.prototype.addOneItem = function(item){
 	});
 
 	this.getPriority(function(priority){
-		console.log("Setting priority of " + item + " to " + priority);
 		result.setPriority(priority);
 	});
 }
@@ -88,6 +119,26 @@ FirebaseStack.prototype.getFirstItem = function(callback){
 }
 
 
+//////////////////////////////////////////////
+// FirebaseQueue
+//////////////////////////////////////////////
+
+/*
+A FirebaseQueue provides first-in-first-out (FIFO) access to a list
+When an item is added, it is added to the back of the list.
+*/
+FirebaseQueue.prototype = new FirebaseDataStructure();
+FirebaseQueue.prototype.constructor = FirebaseQueue;
+
+function FirebaseQueue(ref){
+	FirebaseDataStructure.call(this, ref);
+}
+
+FirebaseQueue.prototype.getDefaultTitle = function(){
+	return "My Action Queue";
+}
+
+
 $(function(){
 	ActionStack = (function(type){
 		var ADD_BUTTON = '#add-button';
@@ -96,8 +147,6 @@ $(function(){
 		var TITLE_ID = '#title';
 		var CURRENT = '#current';
 		var STRUCTURE_ID = '#stack-id';
-
-		var DEFAULT_TITLE = 'Your Action Stack';
 		var FIREBASE_URL = 'https://jkeesh.firebaseio.com/actionstack/';
 		var myRootRef = new Firebase(FIREBASE_URL);
 
@@ -117,6 +166,9 @@ $(function(){
 			if(type == 'stack'){
 				var stackRef = pageRef.child('stack');
 				dataStructure = new FirebaseStack(stackRef);
+			}else if(type == 'queue'){
+				var queueRef = pageRef.child('queue');
+				dataStructure = new FirebaseQueue(queueRef);
 			}else{
 				console.log("Bad type");
 			}
@@ -131,7 +183,7 @@ $(function(){
 		// There is no stack, so create one.
 		function createStructure(){
 		 	pageRef = myRootRef.push({
-				title: DEFAULT_TITLE
+				title: ''
 			});
 			structureID = pageRef.name();
 			location.hash = structureID;
@@ -175,7 +227,12 @@ $(function(){
 
 		// Set the title and id of the stack
 		function setData(){
-			$(TITLE_ID).html(DEFAULT_TITLE);
+			$(TITLE_ID).html(dataStructure.getDefaultTitle());
+
+			pageRef.set({
+				title: dataStructure.getDefaultTitle()
+			});
+
 			$(STRUCTURE_ID).html(structureID);
 		}
 
