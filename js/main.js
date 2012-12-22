@@ -1,5 +1,5 @@
-/// options = 'stack', 'queue'
-var DATA_STRUCTURE_TYPE = 'pqueue';
+/// options = 'stack', 'queue', 'pqueue', 'random'
+var DATA_STRUCTURE_TYPE = 'queue';
 
 /*
 
@@ -30,14 +30,26 @@ FirebaseDataStructure.prototype.getPriority = function(callback){
 }
 
 FirebaseDataStructure.prototype.getFirstItem = function(callback){
-	this.ref.startAt().limit(1).once("child_added", function(snap){
-		callback(snap.ref(), snap.val());
-	});	
+	var self = this;
+	this.size(function(size){
+		if(size == 0){
+			callback(null, null);
+		}
+		self.ref.startAt().limit(1).once("child_added", function(snap){
+			callback(snap.ref(), snap.val());
+		});	
+	});
 }
 
 FirebaseDataStructure.prototype.removeOneItem = function(callback){
 	this.getFirstItem(function(ref, value){
-		ref.remove(callback);
+		if(ref == null){
+			callback(null);
+		}else{
+			ref.remove(function(){
+				callback(value);
+			});			
+		}
 	})
 }
 
@@ -119,8 +131,11 @@ FirebaseStack.prototype.removeOneItem = function(callback){
 }
 
 FirebaseStack.prototype.getFirstItem = function(callback){
+	console.log("Get first.");
 	this.ref.startAt().limit(1).once("child_added", function(snap){
+		console.log("Got first. Now callback.");
 		callback(snap.ref(), snap.val());
+		console.log("Callback done.");
 	});	
 }
 
@@ -192,6 +207,43 @@ FirebasePriorityQueue.prototype.addOneItem = function(item){
 }
 
 
+
+//////////////////////////////////////////////
+// FirebaseRandomList
+//////////////////////////////////////////////
+
+/*
+A FirebaseQueue provides first-in-first-out (FIFO) access to a list
+When an item is added, it is added to the back of the list.
+*/
+FirebaseRandomList.prototype = new FirebaseDataStructure();
+FirebaseRandomList.prototype.constructor = FirebaseRandomList;
+
+FirebaseRandomList.MAX_PRIORITY = 100000;
+
+function FirebaseRandomList(ref){
+	FirebaseDataStructure.call(this, ref);
+}
+
+FirebaseRandomList.prototype.getDefaultTitle = function(){
+	return "My Random List";
+}
+
+/* 
+This function adds an item with value item to our list. The
+priority is chosen randomly.
+*/
+FirebaseRandomList.prototype.addOneItem = function(item){
+	var result = this.ref.push({
+		'value': item
+	});
+
+	var priority = Math.random() * FirebaseRandomList.MAX_PRIORITY;
+	console.log("Set priority to " + priority);
+	result.setPriority(priority);
+}
+
+
 $(function(){
 	ActionStack = (function(type){
 		var ADD_BUTTON = '#add-button';
@@ -225,9 +277,13 @@ $(function(){
 			}else if(type == 'pqueue'){
 				var pqref = pageRef.child('pqueue');
 				dataStructure = new FirebasePriorityQueue(pqref);
+			}else if(type == 'random'){
+				var randRef = pageRef.child('random');
+				dataStructure = new FirebaseRandomList(randRef);
 			}else{
 				console.log("Bad type");
 			}
+			console.log("Set structure.");
 		}
 
 		// Look up an existing action stack
@@ -257,15 +313,22 @@ $(function(){
 
 		// Remove a task from our data structure
 		function removeTask(){
-			dataStructure.removeOneItem(function(success){
-				setCurrent();
+			dataStructure.removeOneItem(function(removed){
+				setCurrent();		
 			});
+		}
+
+		function setTaskHtml(val){
 		}
 
 		// Set the value of the current task
 		function setCurrent(){
 			dataStructure.getFirstItem(function(ref, val){
-				$(CURRENT).html(val.value);
+				if(val){
+					$(CURRENT).html(val.value);								
+				}else{
+					$(CURRENT).html("Empty!");
+				}
 			});
 		}
 
@@ -285,7 +348,7 @@ $(function(){
 		function setData(){
 			$(TITLE_ID).html(dataStructure.getDefaultTitle());
 
-			pageRef.set({
+			pageRef.update({
 				title: dataStructure.getDefaultTitle()
 			});
 
@@ -306,7 +369,9 @@ $(function(){
 
 			setData();
 			setCurrent();
+
 		}
+
 
 		// Do things
 		setup();
